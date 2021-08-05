@@ -33,11 +33,53 @@ class SessionController {
 
     async index(req, res) {
         const { email, password } = req.body;
-        let user = await User.findOne({ email, password });
-        if (!user) {
-            return res.status(400).json({ error: 'Usuário não existe' });
+        let user = await User.findOne({ email })
+            .then(user => {
+                if (!user) return res.status(400).json({ error: 'Usuário não Cadastrado' })
+                bcrypt.compare(password, user.password, (error, data) => {
+                    if (error) return res.status(400).json({ error: 'Erro de API' })
+                    if (data) {
+                        return res.status(200).json({
+                            msg: 'Logado com Sucesso',
+                            id: user._id
+                        })
+                    } else {
+                        return res.status(401).json({ msg: 'Login Inválido' })
+                    }
+                })
+            })
+    }
+
+    async update(req, res) {
+        const schema = yup.object().shape({
+            firstName: yup.string().required(),
+            lastName: yup.string().required(),
+            email: yup.string().required(),
+            password: yup.string().required()
+        });
+        const { firstName, lastName, email, password } = req.body;
+        const { user_id } = req.params;
+        const user = await User.findById(user_id);
+        let dbEmails = await User.findOne({ email })
+
+        if (dbEmails) {
+            return res.status(400).json({ msg: 'E-mail ja Cadastrado' })
         }
-        return res.json(user);
+
+        if (!user) {
+            return res.status(400).json({ error: 'Usuário não logado' })
+        }
+
+        if (!(await schema.isValid(req.body))) {
+            return res.status(400).json({ error: 'Falha na validação' });
+        }
+        await User.updateOne({ _id: user_id }, {
+            firstName,
+            lastName,
+            email,
+            password
+        })
+        return res.json({ msg: 'Usuário Editado com Sucesso' })
     }
 }
 
